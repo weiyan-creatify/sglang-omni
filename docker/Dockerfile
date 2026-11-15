@@ -55,6 +55,12 @@ RUN python3 -c 'import tomllib; print("\n".join(tomllib.load(open("/tmp/pyprojec
     && uv pip install --python /opt/sglang/bin/python3 --no-deps --reinstall flashinfer-python==0.7.2 \
     && rm /tmp/pyproject.toml /tmp/omni-overrides.txt
 
+# Ship bytecode in one layer: uv writes none, so otherwise the server and every
+# stage process of a new container compile each module they import. Some
+# vendored files are not valid Python 3, so failures are expected.
+RUN /opt/sglang/bin/python3 -m compileall -q -j 0 \
+        /opt/sglang/lib/python3.12/site-packages > /dev/null || true
+
 ENV FLASHINFER_WORKSPACE_BASE=/root \
     FLASHINFER_JIT_DEBUG=0
 
