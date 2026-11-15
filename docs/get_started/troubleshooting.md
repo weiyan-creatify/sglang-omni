@@ -56,3 +56,22 @@ python .github/scripts/check_omni_installed_requirements.py
 The install commands keep `--prerelease=allow` from the releases that pinned `cuda-tile==1.6.0rc5`; SGLang 0.5.23 pins no pre-release package and the CUDA path resolves without the flag. With the flag, uv may take a pre-release of any package when one is newer than the latest release on PyPI, which is why `uv pip freeze` can list development or release-candidate versions of packages such as `einops`, `safetensors` or `grpcio`.
 
 SGLang 0.5.23 ships `manylinux_2_34` wheels, so the CUDA path needs glibc 2.34 or newer, as on Ubuntu 22.04. On an older system uv stops with `sglang==0.5.23 has no wheels with a matching platform tag`.
+
+## Slow first start in a new container
+
+**Symptom.** Every new container takes minutes to report ready, while a second start in the same container is fast.
+
+**Cause.** A new container has no compiled kernels. Triton, Inductor, CuTe and JIT CUDA kernels are compiled the first time a stage builds its model and captures its CUDA graphs, and are cached on disk. A container that starts with an empty cache compiles them again on every start.
+
+**Fix.** Build the cache once and ship it in the image:
+
+1. Start the server in a container of the serving image, on the GPU model you deploy, and wait until `/health` returns HTTP 200. Send one request for each configuration you serve.
+2. Copy the cache directories into the image at the same paths.
+
+The caches live under `~/.cache/sglang`, set by `SGLANG_CACHE_DIR`. JIT kernels are in `~/.cache/sglang/jit`, set by `SGLANG_JIT_CACHE_DIR`, which does not follow `SGLANG_CACHE_DIR`: set both when you move the root. `TORCHINDUCTOR_CACHE_DIR` defaults to `~/.cache/sglang-omni/torchinductor`; copy that directory too when it is not empty.
+
+For Qwen3-TTS 1.7B CustomVoice on one H100 with `SGLANG_OMNI_TORCH_COMPILE_DEFAULT=0`, `/health` returned HTTP 200 a median of 235 s after `sgl-omni serve` started with an empty cache, and 99 s with the cache in the image (6 new containers each). The cache was 110 MB in 3,503 files.
+
+- Keep the cache in the image or on local disk. It is thousands of small files, and on a network volume each first open is a round trip.
+- A cache is reused only where it was built for: the same GPU architecture, driver and installed packages. Rebuild it when the image changes; a miss compiles as before.
+- A configuration the first start did not cover compiles on its first request as before.
