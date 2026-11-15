@@ -28,6 +28,7 @@ from sglang_omni.serve.realtime.types import RuntimeLimits
 from sglang_omni.utils.gpu_compat import should_disable_custom_all_reduce_for_gpus
 from sglang_omni.utils.logging import configure_dependency_loggers
 from sglang_omni.utils.process import exit_without_teardown
+from sglang_omni.utils.weight_prefetch import start_weight_prefetch
 
 logger = logging.getLogger(__name__)
 
@@ -504,6 +505,18 @@ def serve(
             help="Report ready without running the pipeline's warmup first.",
         ),
     ] = False,
+    weight_prefetch: Annotated[
+        bool,
+        typer.Option(
+            "--weight-prefetch/--no-weight-prefetch",
+            help=(
+                "Read the model's weight files into the OS page cache with "
+                "parallel helper processes while the stages start. Skipped "
+                "when the model is not on local storage or its weights would "
+                "not fit comfortably in host memory."
+            ),
+        ),
+    ] = True,
     realtime_session_update_timeout_s: Annotated[
         float | None,
         typer.Option(
@@ -639,6 +652,11 @@ def serve(
         stage_offload_components=stage_offload_components,
     )
     merged_config = apply_tensor_parallel_engine_overrides(merged_config)
+
+    if weight_prefetch:
+        start_weight_prefetch(merged_config.model_path)
+    else:
+        pass
 
     if should_print_merged_config(colocate=colocate, log_level=log_level):
         print_merged_config(merged_config)
