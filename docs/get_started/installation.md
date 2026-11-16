@@ -49,9 +49,12 @@ docker run -it \
     --ipc host \
     --network host \
     --privileged \
+    -v sglang-omni-cache:/root/.cache/sglang \
     hongccc/sglang-omni:dev \
     /bin/zsh
 ```
+
+The `sglang-omni-cache` volume keeps compiled kernels across containers, so only the first start of a model compiles them. See [Slow first start in a new container](troubleshooting.md#slow-first-start-in-a-new-container).
 
 **Install SGLang-Omni** inside the container.
 
