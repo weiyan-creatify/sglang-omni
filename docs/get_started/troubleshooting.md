@@ -72,6 +72,6 @@ The caches live under `~/.cache/sglang`, set by `SGLANG_CACHE_DIR`. JIT kernels 
 
 For Qwen3-TTS 1.7B CustomVoice on one H100 with `SGLANG_OMNI_TORCH_COMPILE_DEFAULT=0`, `/health` returned HTTP 200 a median of 235 s after `sgl-omni serve` started with an empty cache, and 99 s with the cache in the image (6 new containers each). The cache was 110 MB in 3,503 files.
 
-- Keep the cache in the image or on local disk. It is thousands of small files, and on a network volume each first open is a round trip.
+- Keep the cache in the image or on local disk. In the same test a copy on a network volume gave no gain: 227 s. A local Docker volume works, as in the [Docker installation](installation.md#docker-recommended) command.
 - A cache is reused only where it was built for: the same GPU architecture, driver and installed packages. Rebuild it when the image changes; a miss compiles as before.
 - A configuration the first start did not cover compiles on its first request as before.
