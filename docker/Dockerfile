@@ -55,6 +55,12 @@ RUN python3 -c 'import tomllib; print("\n".join(tomllib.load(open("/tmp/pyprojec
     && uv pip install --python /opt/sglang/bin/python3 --no-deps --reinstall flashinfer-python==0.7.2 \
     && rm /tmp/pyproject.toml /tmp/omni-overrides.txt
 
+# Ship bytecode in one layer: the base image has almost none and uv writes
+# none, so otherwise each new container compiles every module the server
+# imports before it can start.
+RUN /opt/sglang/bin/python3 -m compileall -q -j 0 \
+        /opt/sglang/lib/python3.12/site-packages
+
 ENV FLASHINFER_WORKSPACE_BASE=/root \
     FLASHINFER_JIT_DEBUG=0
 
